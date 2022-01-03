@@ -1,5 +1,7 @@
+# conda for gitpod env
 anaconda3
 miniconda3
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
