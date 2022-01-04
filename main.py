@@ -49,6 +49,9 @@ def go(config: DictConfig):
             )
 
         if "basic_cleaning" in active_steps:
+            _ = mlflow.run(
+                f"{config['project_name']}/sample.csv:latest"
+            )
             ##################
             # Implement here #
             ##################
