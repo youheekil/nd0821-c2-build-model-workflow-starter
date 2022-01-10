@@ -8,6 +8,7 @@ date: Jan 2022
 import argparse
 import logging
 import wandb
+import pandas as pd
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -19,13 +20,38 @@ def go(args):
     run = wandb.init(job_type="basic_cleaning")
     run.config.update(args)
 
-    # Download input artifact. This will also log that this script is using this
-    # particular version of the artifact
-    # artifact_local_path = run.use_artifact(args.input_artifact).file()
+    # Download input artifact. 
+    logger.info("Downloading artifact")
+    artifact_local_path = run.use_artifact(args.input_artifact).file()
 
-    ######################
-    # YOUR CODE HERE     #
-    ######################
+    # Read csv file with the local path 
+    df = pd.read_csv(artifact_local_path)
+
+    # Drop outliers
+    logger.info("Dropping outliers")
+    min_price = args.min_price
+    max_price = args.max_price
+    idx = df['price'].between(min_price, max_price)
+    df = df[idx].copy()
+    # Convert last_review to datetime
+    df['last_review'] = pd.to_datetime(df['last_review'])
+
+    filename = "clean_sample.csv"
+    df.to_csv(filename, index=False)    
+
+    artifact = wandb.Artifact(
+        args.output_artifact,
+        type=args.output_type,
+        description=args.output_description,
+    )
+
+    artifact.add_file("clean_sample.csv")
+    run.log_artifact(artifact)
+    logger.info("Logging artifact")
+
+
+
+
 
 
 if __name__ == "__main__":

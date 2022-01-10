@@ -49,18 +49,6 @@ def go(config: DictConfig):
             )
 
         if "basic_cleaning" in active_steps:
-            # Cleaning the data
-            _ = mlflow.run(
-                f"{config['project_name']}/sample.csv:latest", 
-                "main",
-                parameters={
-                    "input_artifact": f"{config['project_name']}/sample.csv:latest", 
-                    "artifact_name": "preprocessed_data.csv", 
-                    "artifact_type": "clean_data", 
-                    "artifact_description" =""
-                }
-
-            )
             ##################
             # Implement here #
             ##################
