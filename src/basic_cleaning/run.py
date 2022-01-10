@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+#src/basic_cleaning/run.py
 """
 Download from W&B the raw dataset and apply some basic data cleaning, exporting the result to a new artifact
 
@@ -33,6 +34,7 @@ def go(args):
     max_price = args.max_price
     idx = df['price'].between(min_price, max_price)
     df = df[idx].copy()
+    
     # Convert last_review to datetime
     df['last_review'] = pd.to_datetime(df['last_review'])
 

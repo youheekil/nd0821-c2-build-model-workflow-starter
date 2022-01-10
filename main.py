@@ -1,5 +1,6 @@
-import json
+# main.py
 
+import json
 import mlflow
 import tempfile
 import os
@@ -8,9 +9,9 @@ import hydra
 from omegaconf import DictConfig
 
 _steps = [
-    "download",
-    "basic_cleaning",
-    "data_check",
+    #"download",
+    #"basic_cleaning",
+    #"data_check",
     "data_split",
     "train_random_forest",
     # NOTE: We do not include this in the steps so it is not run by mistake.
@@ -49,22 +50,36 @@ def go(config: DictConfig):
             )
 
         if "basic_cleaning" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            _ = mlflow.run(
+                os.path.join(hydra.utils.get_original_cwd(), "src", "basic_cleaning"),
+                "main",
+                parameters={
+                    "input_artifact": "sample.csv:latest",
+                    "output_artifact": "clean_sample.csv",
+                    "output_type": "clean_sample",
+                    "output_description": "Data with outliers and null values removed",
+                    "min_price": config['etl']['min_price'],
+                    "max_price": config['etl']['max_price']
+                },
+            )
 
         if "data_check" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            _ = mlflow.run(
+                parameters={
+            "steps"="data_check"})
+
+        #TODO: CHECK IF I NEED TO CHANGE THE DATATYPE TO STR
 
         if "data_split" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            _ = mlflow.run(f"{config['main']['components_repository']}/train_val_test_split", 
+            "main", 
+            parameters={
+                    "input": "clean_sample.csv:latest",
+                    "test_size": config["modeling"]["test_size"],
+                    "random_seed": config["modeling"]["random_seed"],
+                    "stratify_by": config["modeling"]["stratify_by"]
+                },
+            )
 
         if "train_random_forest" in active_steps:
 
