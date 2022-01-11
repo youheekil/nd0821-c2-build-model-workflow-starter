@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# src/train_random_forest/run
 """
 This script trains a Random Forest
 """
@@ -13,11 +14,14 @@ import json
 
 import pandas as pd
 import numpy as np
+from wandb.compat.tempfile import TemporaryDirectory
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, FunctionTransformer
+from mlflow.models.signature import infer_signature 
+import tempfile
 
 import wandb
 from sklearn.ensemble import RandomForestRegressor
@@ -51,11 +55,9 @@ def go(args):
     # Fix the random seed for the Random Forest, so we get reproducible results
     rf_config['random_state'] = args.random_seed
 
-    ######################################
-    # Use run.use_artifact(...).file() to get the train and validation artifact (args.trainval_artifact)
-    # and save the returned path in train_local_pat
-    trainval_local_path = # YOUR CODE HERE
-    ######################################
+
+    logger.info("Downloading and reading train and validation artifacts")
+    trainval_local_path = run.use_artifact(args.trainval_artifact).file()
 
     X = pd.read_csv(trainval_local_path)
     y = X.pop("price")  # this removes the column "price" from X and puts it into y
@@ -71,12 +73,9 @@ def go(args):
     sk_pipe, processed_features = get_inference_pipeline(rf_config, args.max_tfidf_features)
 
     # Then fit it to the X_train, y_train data
-    logger.info("Fitting")
+    logger.info("Fitting the pipeline sk_pipe") 
+    sk_pipe(X_train, y_train)
 
-    ######################################
-    # Fit the pipeline sk_pipe by calling the .fit method on X_train and y_train
-    # YOUR CODE HERE
-    ######################################
 
     # Compute r2 and MAE
     logger.info("Scoring")
@@ -97,7 +96,68 @@ def go(args):
     ######################################
     # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
     # HINT: use mlflow.sklearn.save_model
-    # YOUR CODE HERE
+    _signature = infer_signature(X_val, y_pred)
+
+    # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
+    with tempfile.TemporaryDirectory() as random_forest_dir: 
+        export_path = os.path.join(random_forest_dir, "model_export")
+
+        mlflow.sklearn.save_model(
+            """
+            param: sk_model - scikit-learn model to be saved.
+            param: path – Local path where the model is to be saved
+            param: conda_env 
+            """
+        sk_pipe, export_path,serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE, 
+        signature=_signature, 
+        input_example=X_val.iloc[:2], 
+        )
+
+        artifact = wandb.Artifact(
+            args.output_artifact, 
+            type="model_export", 
+            description="Random Forest pipeline export"
+        )
+        artifact.add_dir(export_path)
+        run.log_artifact(artifact)
+
+        artifact.wait()
+
+        
+    def model_export():
+    # model signature  describes model input and output Schema
+    _signature = infer_signature(X_val, val_pred)
+
+    # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
+    with tempfile.TemporaryDirectory() as random_forest_dir: 
+        export_path = os.path.join(random_forest_dir, "model_export")
+
+        mlflow.sklearn.save_model(
+            """
+            param: sk_model - scikit-learn model to be saved.
+            param: path – Local path where the model is to be saved
+            param: conda_env 
+            """
+        sk_pipe, export_path,serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE, 
+        signature=_signature, 
+        input_example=X_val.iloc[:2], 
+        )
+
+        artifact = wandb.Artifact(
+            args.output_artifact, 
+            type="model_export", 
+            description="Random Forest pipeline export"
+        )
+        artifact.add_dir(export_path)
+        run.log_artifact(artifact)
+
+        artifact.wait()
+
+
+
+    # export the model to W&B
+
+
     ######################################
 
     ######################################
