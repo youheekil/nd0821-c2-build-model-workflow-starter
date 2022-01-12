@@ -26,6 +26,8 @@ import tempfile
 import wandb
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import roc_auc_score, plot_confusion_matrix
+
 from sklearn.pipeline import Pipeline, make_pipeline
 
 
@@ -98,76 +100,30 @@ def go(args):
     # HINT: use mlflow.sklearn.save_model
     _signature = infer_signature(X_val, y_pred)
 
-    # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
+
     with tempfile.TemporaryDirectory() as random_forest_dir: 
+
         export_path = os.path.join(random_forest_dir, "model_export")
 
         mlflow.sklearn.save_model(
-            """
-            param: sk_model - scikit-learn model to be saved.
-            param: path – Local path where the model is to be saved
-            param: conda_env 
-            """
-        sk_pipe, export_path,serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE, 
-        signature=_signature, 
-        input_example=X_val.iloc[:2], 
+            sk_pipe, 
+            export_path,serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE, 
+            signature=_signature, 
+            input_example=X_val.iloc[:2], 
         )
-
-        artifact = wandb.Artifact(
-            args.output_artifact, 
-            type="model_export", 
-            description="Random Forest pipeline export"
-        )
-        artifact.add_dir(export_path)
-        run.log_artifact(artifact)
-
-        artifact.wait()
-
         
-    def model_export():
-    # model signature  describes model input and output Schema
-    _signature = infer_signature(X_val, val_pred)
-
-    # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
-    with tempfile.TemporaryDirectory() as random_forest_dir: 
-        export_path = os.path.join(random_forest_dir, "model_export")
-
-        mlflow.sklearn.save_model(
-            """
-            param: sk_model - scikit-learn model to be saved.
-            param: path – Local path where the model is to be saved
-            param: conda_env 
-            """
-        sk_pipe, export_path,serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE, 
-        signature=_signature, 
-        input_example=X_val.iloc[:2], 
-        )
-
         artifact = wandb.Artifact(
             args.output_artifact, 
             type="model_export", 
             description="Random Forest pipeline export"
         )
+
+
         artifact.add_dir(export_path)
+
         run.log_artifact(artifact)
 
         artifact.wait()
-
-
-
-    # export the model to W&B
-
-
-    ######################################
-
-    ######################################
-    # Upload the model we just exported to W&B
-    # HINT: use wandb.Artifact to create an artifact. Use args.output_artifact as artifact name, "model_export" as
-    # type, provide a description and add rf_config as metadata. Then, use the .add_dir method of the artifact instance
-    # you just created to add the "random_forest_dir" directory to the artifact, and finally use
-    # run.log_artifact to log the artifact to the run
-    # YOUR CODE HERE
-    ######################################
 
     # Plot feature importance
     fig_feat_imp = plot_feature_importance(sk_pipe, processed_features)
@@ -176,15 +132,29 @@ def go(args):
     # Here we save r_squared under the "r2" key
     run.summary['r2'] = r_squared
     # Now log the variable "mae" under the key "mae".
-    # YOUR CODE HERE
-    ######################################
+    run.summary['mae'] = mae
+
 
     # Upload to W&B the feture importance visualization
+    fig_cm, sub_cm = plt.subplots(figsize=(10, 10))
+    plot_confusion_matrix(
+        sk_pipe,
+        X_val,
+        y_val,
+        ax=sub_cm,
+        normalize="true",
+        values_format=".1f",
+        xticks_rotation=90,
+    )
+    fig_cm.tight_layout()
+
     run.log(
         {
-          "feature_importance": wandb.Image(fig_feat_imp),
+            "feature_importance": wandb.Image(fig_feat_imp),
+            "confusion_matrix": wandb.Image(fig_cm),
         }
     )
+
 
 
 def plot_feature_importance(pipe, feat_names):
@@ -204,24 +174,25 @@ def plot_feature_importance(pipe, feat_names):
 
 
 def get_inference_pipeline(rf_config, max_tfidf_features):
-    # Let's handle the categorical features first
-    # Ordinal categorical are categorical values for which the order is meaningful, for example
-    # for room type: 'Entire home/apt' > 'Private room' > 'Shared room'
+    # We need 3 separate preprocessing "tracks":
+    # - one for categorical features
+    # - one for numerical features
+    # - one for textual ("nlp") features
+    # Categorical preprocessing pipeline
+
+    # categorical features
+    # Ordinal categorical are categorical values for which the order is meaningful
+    # room type: 'Entire home/apt' > 'Private room' > 'Shared room'
+    # Non ordinal categorical are categorical values for which the order isn't meaningful 
     ordinal_categorical = ["room_type"]
     non_ordinal_categorical = ["neighbourhood_group"]
-    # NOTE: we do not need to impute room_type because the type of the room
-    # is mandatory on the websites, so missing values are not possible in production
-    # (nor during training). That is not true for neighbourhood_group
+
+    # Categorical preprocessing pipeline
     ordinal_categorical_preproc = OrdinalEncoder()
+    non_ordinal_categorical_preproc = make_pipeline(
+        SimpleImputer(strategy="most_frequent",fill_value=0), OneHotEncoder())
 
-    ######################################
-    # Build a pipeline with two steps:
-    # 1 - A SimpleImputer(strategy="most_frequent") to impute missing values
-    # 2 - A OneHotEncoder() step to encode the variable
-    non_ordinal_categorical_preproc = # YOUR CODE HERE
-    ######################################
-
-    # Let's impute the numerical columns to make sure we can handle missing values
+    # Numerical preprocessing pipeline
     # (note that we do not scale because the RF algorithm does not need that)
     zero_imputed = [
         "minimum_nights",
