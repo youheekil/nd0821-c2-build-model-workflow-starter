@@ -108,7 +108,6 @@ def go(config: DictConfig):
                 }, 
             )
 
-        # TODO: CHANGE MODEL_EXPORT TO RANDOM_FOREST_EXPORT 
         if "test_regression_model" in active_steps:
 
             # Test Regression Model and log into 
