@@ -71,5 +71,4 @@ def test_price_range(data, min_price, max_price):
         f"instead min={data['price'].min()} and max={data['price'].max()}"
     )
 
-#def test_kl(data, kl_threshold):
     
