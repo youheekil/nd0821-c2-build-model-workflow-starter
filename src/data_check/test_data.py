@@ -66,4 +66,10 @@ def test_row_count(data):
 
 
 def test_price_range(data, min_price, max_price):
-    assert data['price'].between(min_price, max_price)
+    assert data['price'].between(min_price, max_price).all(), (
+        f"Column price failed the test. Should be between {min_price} and {max_price}, "
+        f"instead min={data['Column'].min()} and max={data['price'].max()}"
+    )
+
+#def test_kl(data, kl_threshold):
+    

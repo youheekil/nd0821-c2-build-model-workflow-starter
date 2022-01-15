@@ -76,11 +76,12 @@ def go(args):
 
     # Then fit it to the X_train, y_train data
     logger.info("Fitting the pipeline sk_pipe") 
-    sk_pipe(X_train, y_train)
-
+    sk_pipe.fit(X_train, y_train)
 
     # Compute r2 and MAE
     logger.info("Scoring")
+    # Evaluate
+
     r_squared = sk_pipe.score(X_val, y_val)
 
     y_pred = sk_pipe.predict(X_val)
@@ -91,16 +92,17 @@ def go(args):
 
     logger.info("Exporting model")
 
-    # Save model package in the MLFlow sklearn format
+        # Save model package in the MLFlow sklearn format
     if os.path.exists("random_forest_dir"):
         shutil.rmtree("random_forest_dir")
+
 
     ######################################
     # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
     # HINT: use mlflow.sklearn.save_model
     _signature = infer_signature(X_val, y_pred)
 
-
+    logger.info("Opening temporary file called random_forest_dir")
     with tempfile.TemporaryDirectory() as random_forest_dir: 
 
         export_path = os.path.join(random_forest_dir, "model_export")
@@ -124,6 +126,7 @@ def go(args):
         run.log_artifact(artifact)
 
         artifact.wait()
+    
 
     # Plot feature importance
     fig_feat_imp = plot_feature_importance(sk_pipe, processed_features)
@@ -136,22 +139,9 @@ def go(args):
 
 
     # Upload to W&B the feture importance visualization
-    fig_cm, sub_cm = plt.subplots(figsize=(10, 10))
-    plot_confusion_matrix(
-        sk_pipe,
-        X_val,
-        y_val,
-        ax=sub_cm,
-        normalize="true",
-        values_format=".1f",
-        xticks_rotation=90,
-    )
-    fig_cm.tight_layout()
-
     run.log(
         {
-            "feature_importance": wandb.Image(fig_feat_imp),
-            "confusion_matrix": wandb.Image(fig_cm),
+            "feature_importance": wandb.Image(fig_feat_imp)
         }
     )
 
@@ -178,7 +168,7 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
     # - one for categorical features
     # - one for numerical features
     # - one for textual ("nlp") features
-    # Categorical preprocessing pipeline
+
 
     # categorical features
     # Ordinal categorical are categorical values for which the order is meaningful
@@ -241,15 +231,19 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
     processed_features = ordinal_categorical + non_ordinal_categorical + zero_imputed + ["last_review", "name"]
 
     # Create random forest
-    random_Forest = RandomForestRegressor(**rf_config)
+    random_forest = RandomForestRegressor(**rf_config)
 
     ######################################
     # Create the inference pipeline. The pipeline must have 2 steps: a step called "preprocessor" applying the
     # ColumnTransformer instance that we saved in the `preprocessor` variable, and a step called "random_forest"
     # with the random forest instance that we just saved in the `random_forest` variable.
     # HINT: Use the explicit Pipeline constructor so you can assign the names to the steps, do not use make_pipeline
-    sk_pipe = # YOUR CODE HERE
-
+    sk_pipe = Pipeline(
+        steps = [
+            ("preprocessor", preprocessor), 
+            ("random_forest", random_forest),
+            ]
+    )
     return sk_pipe, processed_features
 
 
